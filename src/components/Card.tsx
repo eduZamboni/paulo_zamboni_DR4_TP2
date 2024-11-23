@@ -1,6 +1,5 @@
 import { Card as MuiCard, CardContent, Typography } from '@mui/material';
 import Box from './Box';
-import React from 'react';
 
 interface CardProps {
   title: string;
