@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@mui/material";
-import Alert from "./Alert";
+import Alert from "../components/Alert";
 import { useNavigate } from "react-router-dom";
 
 const SignIn = () => {
