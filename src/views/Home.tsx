@@ -13,9 +13,20 @@ import {
   DialogActions,
   Button,
   TextField,
+  Grid,
+  IconButton,
+  Snackbar,
+  Switch,
+  Typography,
+  Alert,
+  LinearProgress,
 } from "@mui/material";
-import { Today, AssignmentTurnedIn } from "@mui/icons-material";
-import Checkbox from "../components/Checkbox";
+import {
+  Today,
+  AssignmentTurnedIn,
+  Close,
+  Settings as SettingsIcon,
+} from "@mui/icons-material";
 import { DateTimePicker } from "@mui/x-date-pickers";
 import dayjs, { Dayjs } from "dayjs";
 
@@ -24,6 +35,9 @@ const Home: React.FC = () => {
 
   const [sleepHours, setSleepHours] = useState<number>(0);
   const [diaperChanges, setDiaperChanges] = useState<number>(0);
+  const [sleepGoal] = useState<number>(12); // Meta diária de sono
+  const [diaperGoal] = useState<number>(10); // Meta diária de fraldas
+
   const [tasks, setTasks] = useState({
     limparMamadeira: false,
     prepararPapinhas: false,
@@ -35,10 +49,16 @@ const Home: React.FC = () => {
 
   // Estado e funções do diálogo
   const [openSleepDialog, setOpenSleepDialog] = useState(false);
-  const [sleepStartTime, setSleepStartTime] = useState<Dayjs | null>(dayjs());
-  const [sleepEndTime, setSleepEndTime] = useState<Dayjs | null>(dayjs());
+  const [sleepStartTime, setSleepStartTime] = useState<Dayjs | null>(null);
+  const [sleepEndTime, setSleepEndTime] = useState<Dayjs | null>(null);
+
+  // Estado para Snackbar e Alert
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
   const handleOpenSleepDialog = () => {
+    setSleepStartTime(null);
+    setSleepEndTime(null);
     setOpenSleepDialog(true);
   };
 
@@ -49,7 +69,15 @@ const Home: React.FC = () => {
   const handleSaveSleep = () => {
     if (sleepStartTime && sleepEndTime) {
       const duration = sleepEndTime.diff(sleepStartTime, "hour", true);
-      updateSleepHours(duration);
+      if (duration > 0) {
+        updateSleepHours(duration);
+        setSnackbarOpen(true);
+        setAlertMessage("");
+      } else {
+        setAlertMessage("A hora de acordar deve ser após a hora de dormir.");
+      }
+    } else {
+      setAlertMessage("Por favor, preencha ambas as datas.");
     }
     setOpenSleepDialog(false);
   };
@@ -74,12 +102,21 @@ const Home: React.FC = () => {
     const totalSleepHours = sleepHours + hours;
     setSleepHours(totalSleepHours);
     localStorage.setItem("sleepHours", totalSleepHours.toString());
+
+    if (totalSleepHours >= sleepGoal) {
+      setAlertMessage(`Meta diária de sono atingida! ${totalSleepHours}/${sleepGoal} horas.`);
+    }
   };
 
   const incrementDiaperChanges = () => {
     const totalDiaperChanges = diaperChanges + 1;
     setDiaperChanges(totalDiaperChanges);
     localStorage.setItem("diaperChanges", totalDiaperChanges.toString());
+    setSnackbarOpen(true);
+
+    if (totalDiaperChanges >= diaperGoal) {
+      setAlertMessage(`Meta diária de fraldas atingida! ${totalDiaperChanges}/${diaperGoal} trocas.`);
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -88,31 +125,42 @@ const Home: React.FC = () => {
 
   const handleTaskChange =
     (field: keyof typeof tasks) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const updatedTasks = { ...tasks, [field]: event.target.checked };
-      setTasks(updatedTasks);
-      localStorage.setItem("dailyTasks", JSON.stringify(updatedTasks));
-    };
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const updatedTasks = { ...tasks, [field]: event.target.checked };
+        setTasks(updatedTasks);
+        localStorage.setItem("dailyTasks", JSON.stringify(updatedTasks));
+      };
 
-  const handleSleepCardClick = () => {
-    handleOpenSleepDialog();
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
   };
 
-  const handleDiaperCardClick = () => {
-    incrementDiaperChanges();
+  const handleAlertClose = () => {
+    setAlertMessage("");
   };
 
   return (
     <main className="App">
       <Container className="header">
-        <h1>Baby Manager</h1>
-        <Avatar
-          name="Paulo Zamboni"
-          size={40}
-          onClick={() => {
-            navigate("/profile");
-          }}
-        />
+        <Typography variant="h4" component="h1">
+          Baby Manager
+        </Typography>
+        <div>
+          <IconButton
+            onClick={() => {
+              navigate("/settings");
+            }}
+          >
+            <SettingsIcon />
+          </IconButton>
+          <IconButton
+            onClick={() => {
+              navigate("/profile");
+            }}
+          >
+            <Avatar name="Paulo Zamboni" size={40} />
+          </IconButton>
+        </div>
       </Container>
 
       <Container className="tabs">
@@ -123,67 +171,91 @@ const Home: React.FC = () => {
           indicatorColor="primary"
           textColor="primary"
         >
-          <Tab
-            icon={<Today />}
-            label="Resumo do Dia"
-            aria-label="Resumo do Dia"
-          />
+          <Tab icon={<Today />} label="Resumo do Dia" aria-label="Resumo do Dia" />
           <Tab
             icon={<AssignmentTurnedIn />}
-            label="Atividades Concluídas"
-            aria-label="Atividades Concluídas"
+            label="Atividades Diárias"
+            aria-label="Atividades Diárias"
           />
         </Tabs>
       </Container>
 
       <Container className="content">
+        {alertMessage && (
+          <Alert severity="success" onClose={handleAlertClose}>
+            {alertMessage}
+          </Alert>
+        )}
         {tabIndex === 0 && (
-          <Card title="Resumo do Dia" stats={[]}>
-            <div className="cards-container">
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
               <Card
                 title="Tempo de Sono"
                 stats={[
                   {
                     title: "Horas Dormidas",
-                    value: sleepHours.toFixed(2),
-                    unit: "horas",
+                    value: `${sleepHours.toFixed(2)}/${sleepGoal} horas`,
                   },
                 ]}
-                onClick={handleSleepCardClick}
-              />
+                onClick={handleOpenSleepDialog}
+              >
+                <LinearProgress
+                  variant="determinate"
+                  value={(sleepHours / sleepGoal) * 100}
+                  style={{ marginTop: "10px" }}
+                />
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6}>
               <Card
                 title="Fraldas Trocadas"
                 stats={[
-                  { title: "Total", value: diaperChanges, unit: "fraldas" },
+                  {
+                    title: "Total",
+                    value: `${diaperChanges}/${diaperGoal} trocas`,
+                  },
                 ]}
-                onClick={handleDiaperCardClick}
-              />
-            </div>
-          </Card>
+                onClick={incrementDiaperChanges}
+              >
+                <LinearProgress
+                  variant="determinate"
+                  value={(diaperChanges / diaperGoal) * 100}
+                  style={{ marginTop: "10px" }}
+                />
+              </Card>
+            </Grid>
+          </Grid>
         )}
         {tabIndex === 1 && (
           <Card title="Atividades Diárias" stats={[]}>
             <div className="checkbox-group">
-              <Checkbox
-                label="Limpar Mamadeira"
-                checked={tasks.limparMamadeira}
-                onChange={handleTaskChange("limparMamadeira")}
-              />
-              <Checkbox
-                label="Preparar Papinhas"
-                checked={tasks.prepararPapinhas}
-                onChange={handleTaskChange("prepararPapinhas")}
-              />
-              <Checkbox
-                label="Verificar Estoque de Fraldas"
-                checked={tasks.verificarFraldas}
-                onChange={handleTaskChange("verificarFraldas")}
-              />
-              <Checkbox
-                label="Verificar Bateria da Babá Eletrônica"
-                checked={tasks.verificarBateriaBaba}
-                onChange={handleTaskChange("verificarBateriaBaba")}
-              />
+              {Object.keys(tasks).map((taskKey) => (
+                <Grid
+                  container
+                  alignItems="center"
+                  key={taskKey}
+                  style={{ marginBottom: "10px" }}
+                >
+                  <Grid item xs>
+                    <Typography>
+                      {taskKey === "limparMamadeira"
+                        ? "Limpar Mamadeira"
+                        : taskKey === "prepararPapinhas"
+                          ? "Preparar Papinhas"
+                          : taskKey === "verificarFraldas"
+                            ? "Verificar Estoque de Fraldas"
+                            : "Verificar Bateria da Babá Eletrônica"}
+                    </Typography>
+                  </Grid>
+                  <Grid item>
+                    <Switch
+                      checked={tasks[taskKey as keyof typeof tasks]}
+                      onChange={handleTaskChange(taskKey as keyof typeof tasks)}
+                      color="primary"
+                    />
+                  </Grid>
+                </Grid>
+              ))}
             </div>
           </Card>
         )}
@@ -220,9 +292,36 @@ const Home: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar para mensagens */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={handleSnackbarClose}
+        message="Registro salvo com sucesso!"
+        action={
+          <IconButton
+            size="small"
+            aria-label="close"
+            color="inherit"
+            onClick={handleSnackbarClose}
+          >
+            <Close fontSize="small" />
+          </IconButton>
+        }
+      />
+
       <FabButton
         onAddDiaperChange={incrementDiaperChanges}
         onOpenSleepDialog={handleOpenSleepDialog}
+        currentTab={tabIndex}
+        markAllTasksComplete={() => {
+          const updatedTasks = Object.keys(tasks).reduce((acc, key) => {
+            acc[key as keyof typeof tasks] = true;
+            return acc;
+          }, {} as typeof tasks);
+          setTasks(updatedTasks);
+          localStorage.setItem("dailyTasks", JSON.stringify(updatedTasks));
+        }}
       />
     </main>
   );

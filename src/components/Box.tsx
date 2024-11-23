@@ -1,3 +1,5 @@
+import { Typography } from "@mui/material";
+
 interface BoxProps {
   title: string;
   value: string | number;
@@ -10,13 +12,15 @@ const Box: React.FC<BoxProps> = ({ title, value, unit, onClick }) => {
     <div
       className="box-container"
       onClick={onClick}
-      role={onClick ? 'button' : undefined}
+      role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      <h2 className="box-title">{title}</h2>
-      <p className="box-value">
+      <Typography variant="subtitle1" className="box-title">
+        {title}
+      </Typography>
+      <Typography variant="h6" className="box-value">
         {value} {unit && <span className="box-unit">{unit}</span>}
-      </p>
+      </Typography>
     </div>
   );
 };
